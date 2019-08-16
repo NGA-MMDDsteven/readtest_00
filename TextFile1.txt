@@ -1,0 +1,156 @@
+//分配99个label=======================================
+	for (int n = 0; n < 100; n++)    ////按顺序，alltrainingdata每第n行样本当作被预测值一次
+	{
+		int nclass = n / 25;   ////计算出被当作sample的那行数据落在哪一组里
+		int labels[99] = { 0 };
+
+		if (nclass == 0)  ////落在第一组，第一组对应位置标签少1
+		{
+			for (int i = 0; i < 99; i++)
+			{
+				if (i < 24) labels[i] = 1;
+				if (i > 23 && i<49) labels[i] = 2;
+				if (i >48 && i<74) labels[i] = 3;
+				if (i >73 && i<99) labels[i] = 4;
+				//printf("%d %d\n", i, labels[i]);
+			}
+		}
+
+		if (nclass == 1)  ////落在第2组，第2组对应位置标签少1
+		{
+			for (int i = 0; i < 99; i++)
+			{
+				if (i < 25) labels[i] = 1;
+				if (i > 24 && i<49) labels[i] = 2;
+				if (i >48 && i<74) labels[i] = 3;
+				if (i >73 && i<99) labels[i] = 4;
+				//printf("%d %d\n", i, labels[i]);
+			}
+		}
+
+		if (nclass == 2)  ////落在第3组，第3组对应位置标签少1
+		{
+			for (int i = 0; i < 99; i++)
+			{
+				if (i < 25) labels[i] = 1;
+				if (i > 24 && i<50) labels[i] = 2;
+				if (i >49 && i<74) labels[i] = 3;
+				if (i >73 && i<99) labels[i] = 4;
+				//printf("%d %d\n", i, labels[i]);
+			}
+		}
+
+		if (nclass == 3)  ////落在第4组，第4组对应位置标签少1
+		{
+			for (int i = 0; i < 99; i++)
+			{
+				if (i < 25) labels[i] = 1;
+				if (i > 24 && i<50) labels[i] = 2;
+				if (i >49 && i<75) labels[i] = 3;
+				if (i >74 && i<99) labels[i] = 4;
+				//printf("%d %d\n", i, labels[i]);
+			}
+		}
+
+		Mat labelsMat(99, 1, CV_32SC1, labels);
+
+		//分配训练集，跳过缺少行的并于label对应=======================================
+		//float trainingData[100][11] = { { 501, 10 },{ 255, 10 },{ 501, 255 },{ 10, 501 } };
+		float realtrain[99][11] = { 0 };
+		for (int i = 0; i < 99; i++)
+		{
+			for (int j = 0; j < 11; j++)
+			{
+				if (i < n) realtrain[i][j] = alltrainingdata[i][j];
+				else realtrain[i][j] = alltrainingdata[i + 1][j];
+			}
+		}
+
+		Mat trainingDataMat(99, 11, CV_32F, realtrain);   //CV_32F
+
+// //try 人工神经网络============================================
+
+		Ptr<ANN_MLP> model = ANN_MLP::create();
+		//共5层：输入层+3个隐藏层+1个输出层，输入层、隐藏层每层均为2个perceptron  
+		Mat layerSizes = (Mat_<int>(1, 5) << 11, 2, 2, 2, 11);
+		//设置各层的神经元个数
+		model->setLayerSizes(layerSizes);
+		//激活函数
+		model->setActivationFunction(ANN_MLP::SIGMOID_SYM);
+		//MLP的训练方法
+		model->setTrainMethod(ANN_MLP::BACKPROP, 0.1, 0.9);
+		Ptr<TrainData> trainData = TrainData::create(trainingDataMat, ROW_SAMPLE, labelsMat);
+		model->train(trainData);
+
+		float sample[1][11] = { 0 };
+		for (int i = 0; i < 11; i++)
+		{
+			sample[0][i] = alltrainingdata[n][i];
+		}
+		Mat sampleMat(1, 11, CV_32F, sample);  //CV_32F,对应上面trainingdata
+
+		Mat r;
+		model->predict(sampleMat, r);
+		printf("response for %d : %f \n", n, r);
+		fprintf(svmresult, "%f \n", r);
+		
+// //try KNN============================================
+/*
+		Ptr<KNearest> knn = KNearest::create();
+		knn->train(trainingDataMat, ROW_SAMPLE, labelsMat);
+
+		float sample[1][11] = { 0 };
+		for (int i = 0; i < 11; i++)
+		{
+			sample[0][i] = alltrainingdata[n][i];
+		}
+		Mat sampleMat(1, 11, CV_32F, sample);  //CV_32F,对应上面trainingdata
+
+
+		float r = knn->predict(sampleMat);
+		printf("response for %d : %f \n", n, r);
+		fprintf(svmresult, "%f \n", r);
+		*/
+		 //try 随机森林============================================
+														  /*
+														  Ptr<RTrees> rtree = RTrees::create();
+														  rtree->train(trainingDataMat, ROW_SAMPLE, labelsMat);
+
+														  float sample[1][11] = { 0 };
+														  for (int i = 0; i < 11; i++)
+														  {
+														  sample[0][i] = alltrainingdata[n][i];
+														  }
+														  Mat sampleMat(1, 11, CV_32F, sample);  //CV_32F,对应上面trainingdata
+
+
+														  float r = rtree->predict(sampleMat);
+														  printf("response for %d : %f \n", n, r);
+														  fprintf(svmresult, "%f \n", r);
+														  */
+// Train the SVM=======================================
+/*
+		Ptr<SVM> svm = SVM::create();
+		svm->setType(SVM::C_SVC); // C-Support Vector Classification. n-class classification (n \f$\geq\f$ 2), allows imperfect separation of classes with penalty multiplier C for outliers.
+								  //svm->setKernel(SVM::LINEAR);
+		svm->setKernel(SVM::INTER);                 ////做完rbf做linear
+													//svm->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER, 100, 1e-6));
+		svm->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER, 100, 1e-6));  ////第一个参数：MAX_ITER，及迭代第二个参数次；EPS，即达到第三个参数精度
+		svm->train(trainingDataMat, ROW_SAMPLE, labelsMat);
+
+		////设置预测样本,是alltrainingdata里面第n行的数据-=======================
+		float sample[1][11] = { 0 };
+		for (int i = 0; i < 11; i++)
+		{
+			sample[0][i] = alltrainingdata[n][i];
+		}
+		Mat sampleMat(1, 11, CV_32F, sample);  //CV_32F,对应上面trainingdata
+
+											   ////进行预测=========================================
+		float response = svm->predict(sampleMat);
+		printf("response for %d : %f \n", n, response);
+		////将每次预测值写入文件
+
+		fprintf(svmresult, "%f \n", response);
+		*/
+	}
